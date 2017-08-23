@@ -1,0 +1,125 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Metadata": {},
+	"Resources": {
+		"LambdaTaggingPolicy": {
+			"Type": "AWS::IAM::Policy",
+			"Properties": {
+				"PolicyName": "LambdaTaggingPolicy",
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+							"Sid": "AllowTagCreation",
+							"Effect": "Allow",
+							"Action": "ec2:CreateTags",
+							"Resource": "*"
+						},
+						{
+							"Sid": "AllowDescribeResource",
+							"Effect": "Allow",
+							"Action": "ec2:Describe*",
+							"Resource": "*"
+						},
+						{
+							"Sid": "AllowLambdaRights",
+							"Effect": "Allow",
+							"Action": [
+								"logs:CreateLogGroup",
+								"logs:CreateLogStream",
+								"logs:PutLogEvents"
+							],
+							"Resource": "arn:aws:logs:*:*:*"
+						},
+						{
+							"Sid": "AllowCreateENI",
+							"Effect": "Allow",
+							"Action": [
+								"ec2:CreateNetworkInterface",
+								"ec2:DescribeNetworkInterfaces",
+								"ec2:DeleteNetworkInterface"
+							],
+							"Resource": "*"
+						}
+					]
+				},
+				"Roles": [{
+					"Ref": "LambdaTaggingRole"
+				}]
+			}
+		},
+		"LambdaTaggingRole": {
+			"Type": "AWS::IAM::Role",
+			"Properties": {
+				"AssumeRolePolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Effect": "Allow",
+						"Principal": {
+							"Service": ["lambda.amazonaws.com"]
+						},
+						"Action": ["sts:AssumeRole"]
+					}]
+				}
+			}
+		},
+		"LambdaTaggingFunction": {
+			"Type": "AWS::Lambda::Function",
+			"Properties": {
+				"Handler": "Lambda_Tagging.lambda_handler",
+				"Role": {
+					"Fn::GetAtt": ["LambdaTaggingRole", "Arn"]
+				},
+				"Code": {
+					"S3Bucket": "unitedcftemplates",
+					"S3Key": "Lambda_Tagging.zip"
+				},
+				"Runtime": "python3.6",
+				"Timeout": "25",
+				"Tags": [{
+						"Key": "ENVUID",
+						"Value": "COREIT"
+					},
+					{
+						"Key": "appci",
+						"Value": "LambdaTagging"
+					}
+				]
+			}
+		},
+		"PermissionInvokeLambda": {
+			"Type": "AWS::Lambda::Permission",
+			"Properties": {
+				"FunctionName": {
+					"Fn::GetAtt": ["LambdaTaggingFunction", "Arn"]
+				},
+				"Action": "lambda:InvokeFunction",
+				"Principal": "events.amazonaws.com",
+				"SourceArn": {
+					"Fn::GetAtt": ["Every10Minutes", "Arn"]
+				}
+			},
+			"DependsOn": [
+				"LambdaTaggingRole",
+				"LambdaTaggingFunction",
+				"Every10Minutes"
+			]
+		},
+		"Every10Minutes": {
+			"Type": "AWS::Events::Rule",
+			"Properties": {
+				"Description": "ScheduledRule",
+				"ScheduleExpression": "rate(10 minutes)",
+				"State": "ENABLED",
+				"Targets": [{
+					"Arn": {
+						"Fn::GetAtt": ["LambdaTaggingFunction", "Arn"]
+					},
+					"Id": "TargetLambdaTaggingv1"
+				}]
+			},
+			"DependsOn": [
+				"LambdaTaggingFunction"
+			]
+		}
+	}
+}
