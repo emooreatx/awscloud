@@ -70,7 +70,7 @@
 					"Fn::GetAtt": ["LambdaTaggingRole", "Arn"]
 				},
 				"Code": {
-					"S3Bucket": "unitedcftemplates",
+					"S3Bucket": "allofmycftemplates",
 					"S3Key": "Lambda_Tagging.zip"
 				},
 				"Runtime": "python3.6",
