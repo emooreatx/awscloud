@@ -73,12 +73,5 @@
         }]
       }
     }    
-  },
- 
-  "Outputs" : {
-    "TBD" : {
-      "Description": "ID returned by the lambda function",
-      "Value" : { "Fn::GetAtt": [ "LambdaFunction", "Id" ] }
-    }
-  }  
+  } 
 }
