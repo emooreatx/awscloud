@@ -13,7 +13,7 @@ def lambda_handler(event, context):
             for tag in vol.tags:
                 if tag['Key'] == 'Name':
                     value=tag['Value']
-                    if value != 'DND' and vol.state=='available':
+                    if value == 'DELETE' and vol.state=='available':
                         vid=vol.id
                         v=ec2.Volume(vol.id)
                         v.delete()
