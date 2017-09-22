@@ -1,0 +1,78 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+ 
+  "Description" : "This is a template to run a lambda function once. Specify the bucket, the name of the zip file with your source code, and the name of the file itself. Assumes python 3.6. Make sure your lambda handler in your code is called lambda_handler. You will probably need to modify the code inside of this template to allow the permissions you need for your lambda to function.",
+ 
+  "Parameters": {
+    "ModuleName" : {
+      "Description" : "The name of the Source code file without file extension",
+      "Type" : "String",
+      "Default" : "ResetRules"
+    },
+    "S3Bucket" : {
+      "Description" : "The name of the bucket that contains your packaged source",
+      "Type" : "String",
+	  "Default" : "cftemplates"
+    },
+    "S3Key" : {
+      "Description" : "The name of the ZIP package",
+      "Type" : "String",
+      "Default" : "ResetRules.zip"
+    }
+  },
+ 
+  "Resources" : {
+ 
+    "RunLambda": {
+      "Type": "Custom::RunLambda",
+      "Properties": {
+        "ServiceToken": { "Fn::GetAtt" : ["LambdaFunction", "Arn"] }
+      }
+    },
+ 
+    "LambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+            "S3Bucket": { "Ref": "S3Bucket" },
+            "S3Key": { "Ref": "S3Key" }
+        },
+        "Handler": { "Fn::Join" : [ "", [{ "Ref": "ModuleName" },".lambda_handler"] ] },
+        "Role": { "Fn::GetAtt" : ["LambdaExecutionRole", "Arn"] },        
+        "Runtime": "python3.6",
+        "Timeout": "120"
+      }
+    },
+ 
+    "LambdaExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{
+              "Effect": "Allow",
+              "Principal": {"Service": ["lambda.amazonaws.com"]},
+              "Action": ["sts:AssumeRole"]
+          }]
+        },
+        "Path": "/",
+        "Policies": [{
+          "PolicyName": "root",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Action": ["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],
+                "Resource": "arn:aws:logs:*:*:*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": ["ec2:*"],
+                "Resource": "*"
+            }]
+          }
+        }]
+      }
+    }    
+  } 
+}

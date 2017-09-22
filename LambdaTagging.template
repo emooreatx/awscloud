@@ -39,7 +39,18 @@
 								"ec2:DeleteNetworkInterface"
 							],
 							"Resource": "*"
-						}
+						},
+						{
+							"Sid": "AllowDescribeTagRDSELB",
+							"Effect": "Allow",
+							"Action": [
+								"elasticloadbalancing:DescribeLoadBalancers",
+								"elasticloadbalancing:AddTags",
+								"rds:AddTagsToResource",
+								"rds:DescribeDBInstances"
+							],
+							"Resource": "*"
+						}						
 					]
 				},
 				"Roles": [{
@@ -70,11 +81,11 @@
 					"Fn::GetAtt": ["LambdaTaggingRole", "Arn"]
 				},
 				"Code": {
-					"S3Bucket": "allofmycftemplates",
-					"S3Key": "Lambda_Tagging.zip"
+					"S3Bucket": "unitedcftemplates",
+					"S3Key": "Lambda_Taggingv2.zip"
 				},
 				"Runtime": "python3.6",
-				"Timeout": "25",
+				"Timeout": "300",
 				"Tags": [{
 						"Key": "ENVUID",
 						"Value": "COREIT"
