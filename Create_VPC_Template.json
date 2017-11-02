@@ -1,0 +1,43 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "AWS CloudFormation Sample Template VPC_Single_Instance_In_Subnet: Sample template showing how to create a VPC and add an EC2 instance with an Elastic IP address and a security group. **WARNING** This template creates an Amazon EC2 instance. You will be billed for the AWS resources used if you create a stack from this template.",
+
+  "Parameters" : {
+	"VPCCIDR" : {
+		"Description" : "The CIDR range for the new VPC",
+		"Type": "String",
+		"MinLength": "9",
+		"MaxLength": "18",
+		"Default": "10.41.128.0/24",
+		"AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+		"ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+	},
+	"VPCNAME" : {
+		"Description" : "The name of the new VPC",
+		"Type" : "String",
+		"Default" : "SomeName"
+	}
+	
+  },
+
+  "Resources" : {
+
+	"VPC" : {
+	  "Type" : "AWS::EC2::VPC",
+	  "Properties" : {
+		"CidrBlock" : {"Ref": "VPCCIDR"},
+		"Tags" : [ {"Key" : "Name", "Value" : { "Ref" : "VPCNAME"} } ]
+	  }
+	}
+  },
+
+
+  "Outputs" : {
+	"VPCID" : {
+	  "Value" : {"Ref": "VPC"},
+	  "Description" : "VPC ID"
+	}
+  }
+}
+
