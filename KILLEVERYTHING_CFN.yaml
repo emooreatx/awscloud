@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: 'Deploys a Lambda function to shut down compute resources and the necessary IAM policy'
+Resources:
+  ShutdownResourcesRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: 'ShutdownResourcesPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:StopInstances'
+                  - 'ec2:DescribeRegions'
+                  - 'sagemaker:ListEndpoints'
+                  - 'sagemaker:DeleteEndpoint'
+                  - 'ecs:ListClusters'
+                  - 'ecs:ListServices'
+                  - 'ecs:UpdateService'
+                  - 'ecs:DeleteCluster'
+                  - 'eks:ListClusters'
+                  - 'eks:DeleteCluster'
+                  - 'batch:DescribeJobQueues'
+                  - 'batch:UpdateJobQueue'
+                  - 'rds:DescribeDBInstances'
+                  - 'rds:StopDBInstance'
+                Resource: '*'
+
+  ShutdownResourcesFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: 'index.lambda_handler'
+      Role: !GetAtt ShutdownResourcesRole.Arn
+      InlineCode: |
+        import boto3
+
+        def shut_down_all_resources(event, context):
+            ec2_global = boto3.client('ec2')
+            regions = [region['RegionName'] for region in ec2_global.describe_regions()['Regions']]
+
+            for region in regions:
+                print(f"Processing region: {region}")
+                try:
+                    # EC2
+                    print("Shutting down EC2 instances...")
+                    ec2 = boto3.client('ec2', region_name=region)
+                    instances_to_stop = [i['InstanceId'] for r in ec2.describe_instances()['Reservations'] for i in r['Instances']]
+                    if instances_to_stop:
+                        print(f"Stopping EC2 instances: {instances_to_stop}")
+                        ec2.stop_instances(InstanceIds=instances_to_stop)
+
+                    # SageMaker
+                    print("Deleting SageMaker endpoints...")
+                    sagemaker = boto3.client('sagemaker', region_name=region)
+                    endpoints = sagemaker.list_endpoints(MaxResults=99)['Endpoints']
+                    for endpoint in endpoints:
+                        print(f"Deleting SageMaker endpoint: {endpoint['EndpointName']}")
+                        sagemaker.delete_endpoint(EndpointName=endpoint['EndpointName'])
+
+                    # ECS & Fargate
+                    print("Shutting down ECS clusters and services...")
+                    ecs = boto3.client('ecs', region_name=region)
+                    clusters = ecs.list_clusters()['clusterArns']
+                    for cluster in clusters:
+                        print(f"Shutting down ECS cluster: {cluster}")
+                        services = ecs.list_services(cluster=cluster)['serviceArns']
+                        for service in services:
+                            print(f"Stopping ECS service: {service}")
+                            ecs.update_service(cluster=cluster, service=service, desiredCount=0)
+                        ecs.delete_cluster(cluster=cluster)
+
+                    # EKS
+                    print("Deleting EKS clusters...")
+                    eks = boto3.client('eks', region_name=region)
+                    clusters = eks.list_clusters()['clusters']
+                    for cluster in clusters:
+                        print(f"Deleting EKS cluster: {cluster}")
+                        eks.delete_cluster(name=cluster)
+
+                    # Batch
+                    print("Disabling Batch job queues...")
+                    batch = boto3.client('batch', region_name=region)
+                    job_queues = batch.describe_job_queues()['jobQueues']
+                    for job_queue in job_queues:
+                        print(f"Disabling Batch job queue: {job_queue['jobQueueName']}")
+                        batch.update_job_queue(jobQueue=job_queue['jobQueueName'], state='DISABLED')
+                    # RDS
+                    print("Stopping RDS instances...")
+                    rds = boto3.client('rds', region_name=region)
+                    instances = rds.describe_db_instances()['DBInstances']
+                    for instance in instances:
+                        print(f"Stopping RDS instance: {instance['DBInstanceIdentifier']}")
+                        rds.stop_db_instance(DBInstanceIdentifier=instance['DBInstanceIdentifier'])
+
+                    print(f"Region {region} processed.")
+                except Exception as e:
+                    print(f"An error occurred in region {region}: {str(e)}. Skipping region.")
+
+            print("All compute resources have been shut down.")
+            return {
+                'statusCode': 200,
+                'body': 'All compute resources, including RDS, have been shut down'
+            }
+
+        def lambda_handler(event, context):
+            return shut_down_all_resources(event, context)
+      Runtime: 'python3.8'
+      Timeout: 300
+      MemorySize: 128
+
+Outputs:
+  LambdaFunctionArn:
+    Description: 'ARN of the Lambda function'
+    Value: !GetAtt ShutdownResourcesFunction.Arn
